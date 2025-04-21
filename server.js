@@ -274,12 +274,17 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    // Ensure profile picture has full URL
+    const profilePicture = user.profilePicture.startsWith('http') 
+      ? user.profilePicture 
+      : getFullImageUrl(user.profilePicture);
+
     // Create token with user information
     const token = jwt.sign(
       { 
         username: user.username, 
-        profilePicture: user.profilePicture,
-        role: user.role // Make sure role is included in token
+        profilePicture: profilePicture,
+        role: user.role
       }, 
       process.env.JWT_SECRET || 'your-secret-key'
     );
@@ -289,8 +294,8 @@ app.post('/api/login', async (req, res) => {
       token, 
       user: { 
         username: user.username, 
-        profilePicture: user.profilePicture,
-        role: user.role // Make sure role is included in response
+        profilePicture: profilePicture,
+        role: user.role
       } 
     });
   } catch (error) {
@@ -329,10 +334,9 @@ app.post('/api/wins', authenticateUser, upload.single('image'), async (req, res)
       description,
       imageUrl,
       createdBy: req.user.username,
-      userProfilePic: req.user.profilePicture,
+      userProfilePic: req.user.profilePicture, // This should already be a full URL from the token
       isEnjayyWin: isEnjayyWin === 'true',
       kickClipUrl: kickClipUrl || '',
-      // Auto-approve if user is admin, regardless of win type
       status: req.user.role === 'admin' ? 'approved' : 'pending'
     });
 
@@ -631,7 +635,7 @@ app.get('/api/users/:username', async (req, res) => {
     // Ensure profile picture has full URL
     const profilePicture = user.profilePicture.startsWith('http') 
       ? user.profilePicture 
-      : `${process.env.BACKEND_URL || 'https://gambling-wins-backend.onrender.com'}${user.profilePicture}`;
+      : getFullImageUrl(user.profilePicture);
 
     res.json({
       username: user.username,
@@ -766,10 +770,15 @@ app.put('/api/notifications/read', authenticateUser, async (req, res) => {
 // Get unread notification count
 app.get('/api/notifications/unread/count', authenticateUser, async (req, res) => {
   try {
+    // Add debug logging
+    console.log('User requesting unread count:', req.user);
+    
     const count = await Notification.countDocuments({
       userId: req.user.username,
       read: false
     });
+    
+    console.log('Unread count for user:', count);
     res.json({ count });
   } catch (error) {
     console.error('Error counting unread notifications:', error);
