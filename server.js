@@ -150,8 +150,20 @@ const winSchema = new mongoose.Schema({
   kickClipUrl: { type: String }
 });
 
+// Add Notification Schema
+const notificationSchema = new mongoose.Schema({
+  userId: { type: String, required: true }, // username of the recipient
+  type: { type: String, enum: ['win_approved', 'win_rejected'], required: true },
+  winId: { type: mongoose.Schema.Types.ObjectId, ref: 'Win', required: true },
+  winTitle: { type: String, required: true },
+  message: String, // Optional admin comment
+  read: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
+
 const User = mongoose.model('User', userSchema);
 const Win = mongoose.model('Win', winSchema);
+const Notification = mongoose.model('Notification', notificationSchema);
 
 // Initialize default users
 const initializeUsers = async () => {
@@ -483,6 +495,19 @@ app.put('/api/wins/:id/moderate', authenticateAdmin, async (req, res) => {
       },
       { new: true }
     );
+
+    // Create notification for the user
+    if (win) {
+      const notification = new Notification({
+        userId: win.createdBy,
+        type: status === 'approved' ? 'win_approved' : 'win_rejected',
+        winId: win._id,
+        winTitle: win.title,
+        message: moderationComment || undefined
+      });
+      await notification.save();
+    }
+
     res.json(win);
   } catch (error) {
     console.error('Error moderating win:', error);
@@ -700,6 +725,54 @@ app.put('/api/users/settings', authenticateUser, upload.single('profilePicture')
     });
   } catch (error) {
     console.error('Error updating user settings:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get user notifications
+app.get('/api/notifications', authenticateUser, async (req, res) => {
+  try {
+    const notifications = await Notification.find({ 
+      userId: req.user.username 
+    })
+    .sort({ createdAt: -1 })
+    .limit(50);
+    
+    res.json(notifications);
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Mark notifications as read
+app.put('/api/notifications/read', authenticateUser, async (req, res) => {
+  try {
+    const { notificationIds } = req.body;
+    await Notification.updateMany(
+      { 
+        _id: { $in: notificationIds },
+        userId: req.user.username // Security check
+      },
+      { read: true }
+    );
+    res.json({ message: 'Notifications marked as read' });
+  } catch (error) {
+    console.error('Error marking notifications as read:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get unread notification count
+app.get('/api/notifications/unread/count', authenticateUser, async (req, res) => {
+  try {
+    const count = await Notification.countDocuments({
+      userId: req.user.username,
+      read: false
+    });
+    res.json({ count });
+  } catch (error) {
+    console.error('Error counting unread notifications:', error);
     res.status(500).json({ message: error.message });
   }
 });
