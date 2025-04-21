@@ -56,7 +56,7 @@ app.use(cors({
       'https://gambling-wins-frontend.vercel.app',
       'https://gemblewins.vercel.app'
     ];
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
