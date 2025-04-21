@@ -44,45 +44,38 @@ const checkText = (text) => {
   return text;
 };
 
-// CORS configuration
+// CORS configuration - must be before other middleware
 app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: function(origin, callback) {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if(!origin) return callback(null, true);
+    
+    const allowedOrigins = ['http://localhost:3000', 'https://gambling-wins-frontend.vercel.app'];
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'X-Requested-With', 'Accept']
 }));
-
-// Additional CORS headers for all responses
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-  next();
-});
-
-// Create uploads directory if it doesn't exist
-const fs = require('fs');
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 // Middleware
 app.use(express.json());
-app.use('/uploads', express.static(uploadsDir));
+app.use('/uploads', express.static('uploads'));
 
-// MongoDB Connection
+// MongoDB Connection with updated options
 mongoose.connect("mongodb+srv://DaveAlde:NwTtd7vZp7rNaHOM@cluster0.x5pccae.mongodb.net/gemblewins?retryWrites=true&w=majority&appName=Cluster0", {
   useNewUrlParser: true,
-  useUnifiedTopology: true
+  useUnifiedTopology: true,
+  ssl: true,
+  sslValidate: true,
+  retryWrites: true,
+  w: 'majority',
+  connectTimeoutMS: 30000,
+  socketTimeoutMS: 30000
 }).then(() => {
   console.log('Connected to MongoDB Atlas successfully');
 }).catch((err) => {
@@ -102,7 +95,7 @@ mongoose.connection.once('open', () => {
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, uploadsDir);
+    cb(null, 'uploads/');
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + '-' + file.originalname);
@@ -564,6 +557,12 @@ app.put('/api/users/settings', authenticateUser, upload.single('profilePicture')
     res.status(500).json({ message: error.message });
   }
 });
+
+// Create uploads directory if it doesn't exist
+const fs = require('fs');
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
