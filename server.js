@@ -372,14 +372,8 @@ app.get('/api/wins', async (req, res) => {
 
     const wins = await Win.find(query).sort({ createdAt: -1 });
 
-    // No wins found
-    if (!wins || wins.length === 0) {
-      return res.status(404).json({
-        message: 'No wins found matching the criteria'
-      });
-    }
-
-    res.json(wins);
+    // Return empty array if no wins found (instead of 404)
+    res.json(wins || []);
 
   } catch (error) {
     console.error('Error fetching wins:', error);
