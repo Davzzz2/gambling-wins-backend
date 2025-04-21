@@ -127,6 +127,11 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ['admin', 'user'], default: 'user' },
   joinDate: { type: Date, default: Date.now },
   lastUsernameChange: { type: Date },
+  badges: [{
+    type: { type: String, enum: ['firstUser'] },
+    label: String,
+    description: String
+  }]
 });
 
 const winSchema = new mongoose.Schema({
@@ -440,6 +445,21 @@ app.put('/api/wins/:id', authenticateAdmin, upload.single('image'), async (req, 
 // Delete a win
 app.delete('/api/wins/:id', authenticateAdmin, async (req, res) => {
   try {
+    // First get the win to get the image path
+    const win = await Win.findById(req.params.id);
+    if (!win) {
+      return res.status(404).json({ message: 'Win not found' });
+    }
+
+    // Delete the image file if it exists and is a local file
+    if (win.imageUrl && !win.imageUrl.startsWith('http')) {
+      const imagePath = path.join(uploadDir, path.basename(win.imageUrl));
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
+
+    // Delete from database
     await Win.findByIdAndDelete(req.params.id);
     res.json({ message: 'Win deleted successfully' });
   } catch (error) {
@@ -504,12 +524,24 @@ app.post('/api/register', async (req, res) => {
       return res.status(400).json({ message: 'Username already exists' });
     }
 
+    // Check if this is the first non-admin user
+    const userCount = await User.countDocuments({ role: 'user' });
+    const badges = [];
+    if (userCount === 0) {
+      badges.push({
+        type: 'firstUser',
+        label: '👑 Pioneer',
+        description: 'First registered user on the platform'
+      });
+    }
+
     // Create new user with 'user' role
     const user = new User({
       username,
       password,
       role: 'user',
-      profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`
+      profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`,
+      badges
     });
 
     await user.save();
@@ -544,13 +576,21 @@ app.get('/api/users/:username', async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(6);
 
+    // Convert wins to include full image URLs
+    const formattedWins = recentWins.map(win => {
+      const winObj = win.toObject();
+      winObj.imageUrl = getFullImageUrl(winObj.imageUrl);
+      return winObj;
+    });
+
     res.json({
       username: user.username,
       profilePicture: user.profilePicture,
       role: user.role,
       joinDate: user.joinDate,
+      badges: user.badges || [],
       uploadCount,
-      recentWins
+      recentWins: formattedWins
     });
   } catch (error) {
     console.error('Error fetching user profile:', error);
