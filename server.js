@@ -70,8 +70,8 @@ app.use(cors({
 // Middleware
 app.use(express.json());
 
-// Configure file storage for Render's ephemeral filesystem
-const uploadDir = process.env.NODE_ENV === 'production' ? '/tmp/uploads' : 'uploads';
+// Configure file storage to use local uploads directory
+const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
