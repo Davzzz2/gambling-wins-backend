@@ -501,7 +501,7 @@ app.get('/api/wins/pending', authenticateAdmin, async (req, res) => {
 });
 
 // User registration endpoint
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -535,17 +535,31 @@ app.post('/api/register', async (req, res) => {
       });
     }
 
+    // Set profile picture URL
+    let profilePictureUrl;
+    if (req.file) {
+      // If a file was uploaded, use its path
+      profilePictureUrl = `/uploads/${req.file.filename}`;
+    } else {
+      // Generate avatar URL if no file was uploaded
+      profilePictureUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random&size=200`;
+    }
+
     // Create new user with 'user' role
     const user = new User({
       username,
       password,
       role: 'user',
-      profilePicture: `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`,
-      badges
+      profilePicture: profilePictureUrl,
+      badges,
+      joinDate: new Date()
     });
 
     await user.save();
-    res.status(201).json({ message: 'User registered successfully' });
+    res.status(201).json({ 
+      message: 'User registered successfully',
+      badges: user.badges // Return badges so frontend can show them
+    });
   } catch (error) {
     console.error('Error registering user:', error);
     res.status(500).json({ message: 'Error registering user' });
