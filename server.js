@@ -232,6 +232,13 @@ const authenticateUser = (req, res, next) => {
   });
 };
 
+// Helper function to get full URL for images
+const getFullImageUrl = (relativePath) => {
+  if (!relativePath) return null;
+  if (relativePath.startsWith('http')) return relativePath;
+  return `${process.env.BACKEND_URL || 'https://gambling-wins-backend.onrender.com'}${relativePath}`;
+};
+
 // Routes
 // Login route
 app.post('/api/login', async (req, res) => {
@@ -298,10 +305,11 @@ app.post('/api/wins', authenticateUser, upload.single('image'), async (req, res)
       return res.status(403).json({ message: 'Admin access required to post Enjayy wins' });
     }
 
+    const imageUrl = `/uploads/${req.file.filename}`;
     const win = new Win({
       title,
       description,
-      imageUrl: `/uploads/${req.file.filename}`,
+      imageUrl,
       createdBy: req.user.username,
       userProfilePic: req.user.profilePicture,
       isEnjayyWin: isEnjayyWin === 'true',
@@ -311,7 +319,12 @@ app.post('/api/wins', authenticateUser, upload.single('image'), async (req, res)
     });
 
     await win.save();
-    res.status(201).json(win);
+    
+    // Convert relative image URL to full URL before sending response
+    const responseWin = win.toObject();
+    responseWin.imageUrl = getFullImageUrl(responseWin.imageUrl);
+    
+    res.status(201).json(responseWin);
   } catch (error) {
     console.error('Error creating win:', error);
     res.status(500).json({ message: error.message });
@@ -372,8 +385,15 @@ app.get('/api/wins', async (req, res) => {
 
     const wins = await Win.find(query).sort({ createdAt: -1 });
 
+    // Convert wins to plain objects and update image URLs
+    const responseWins = wins.map(win => {
+      const winObj = win.toObject();
+      winObj.imageUrl = getFullImageUrl(winObj.imageUrl);
+      return winObj;
+    });
+
     // Return empty array if no wins found (instead of 404)
-    res.json(wins || []);
+    res.json(responseWins || []);
 
   } catch (error) {
     console.error('Error fetching wins:', error);
