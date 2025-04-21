@@ -307,6 +307,21 @@ app.post('/api/wins', authenticateUser, upload.single('image'), async (req, res)
 app.get('/api/wins', async (req, res) => {
   try {
     const { type, status } = req.query;
+    
+    // Validate query parameters
+    if (type && !['enjayy', 'community', 'all'].includes(type)) {
+      return res.status(400).json({ 
+        message: 'Invalid type parameter. Must be one of: enjayy, community, all' 
+      });
+    }
+
+    if (status && !['approved', 'pending', 'rejected'].includes(status)) {
+      return res.status(400).json({ 
+        message: 'Invalid status parameter. Must be one of: approved, pending, rejected' 
+      });
+    }
+
+    // Build query
     const query = { status: 'approved' };
     
     if (type === 'enjayy') {
@@ -315,7 +330,7 @@ app.get('/api/wins', async (req, res) => {
       query.isEnjayyWin = false;
     }
 
-    // If admin is requesting and status is specified, override status filter
+    // Check admin status and handle status filter
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     let isAdmin = false;
@@ -329,14 +344,51 @@ app.get('/api/wins', async (req, res) => {
         }
       } catch (error) {
         console.error('Token verification error:', error);
+        // Don't return error - just continue as non-admin
       }
     }
 
+    // If non-admin tries to filter by status
+    if (status && !isAdmin) {
+      return res.status(403).json({
+        message: 'Only admins can filter by status'
+      });
+    }
+
     const wins = await Win.find(query).sort({ createdAt: -1 });
+
+    // No wins found
+    if (!wins || wins.length === 0) {
+      return res.status(404).json({
+        message: 'No wins found matching the criteria'
+      });
+    }
+
     res.json(wins);
+
   } catch (error) {
     console.error('Error fetching wins:', error);
-    res.status(500).json({ message: error.message });
+    
+    // Handle specific database errors
+    if (error.name === 'MongoServerError') {
+      return res.status(503).json({ 
+        message: 'Database service unavailable. Please try again later.'
+      });
+    }
+    
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: 'Invalid query parameters',
+        details: error.message
+      });
+    }
+
+    // Generic server error
+    res.status(500).json({ 
+      message: 'An unexpected error occurred while fetching wins',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
   }
 });
 
