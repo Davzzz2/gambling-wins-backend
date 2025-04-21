@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const multer = require('multer');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,8 +51,12 @@ app.use(cors({
     // allow requests with no origin (like mobile apps or curl requests)
     if(!origin) return callback(null, true);
     
-    const allowedOrigins = ['http://localhost:3000', 'https://gambling-wins-frontend.vercel.app'];
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'https://gambling-wins-frontend.vercel.app',
+      'https://gemblewins.vercel.app'
+    ];
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -64,10 +69,19 @@ app.use(cors({
 
 // Middleware
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+
+// Configure file storage for Render's ephemeral filesystem
+const uploadDir = process.env.NODE_ENV === 'production' ? '/tmp/uploads' : 'uploads';
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+app.use('/uploads', express.static(uploadDir));
 
 // MongoDB Connection with updated options
-mongoose.connect("mongodb+srv://DaveAlde:NwTtd7vZp7rNaHOM@cluster0.x5pccae.mongodb.net/gemblewins?retryWrites=true&w=majority&appName=Cluster0", {
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://DaveAlde:NwTtd7vZp7rNaHOM@cluster0.x5pccae.mongodb.net/gemblewins?retryWrites=true&w=majority&appName=Cluster0";
+
+mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,
   ssl: true,
@@ -80,6 +94,7 @@ mongoose.connect("mongodb+srv://DaveAlde:NwTtd7vZp7rNaHOM@cluster0.x5pccae.mongo
   console.log('Connected to MongoDB Atlas successfully');
 }).catch((err) => {
   console.error('MongoDB connection error:', err);
+  process.exit(1);
 });
 
 // Add connection error handler
@@ -95,7 +110,7 @@ mongoose.connection.once('open', () => {
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/');
+    cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + '-' + file.originalname);
@@ -609,12 +624,6 @@ app.put('/api/users/settings', authenticateUser, upload.single('profilePicture')
     res.status(500).json({ message: error.message });
   }
 });
-
-// Create uploads directory if it doesn't exist
-const fs = require('fs');
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
