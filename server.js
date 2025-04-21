@@ -524,22 +524,22 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
       return res.status(400).json({ message: 'Username already exists' });
     }
 
-    // Check if this is the first non-admin user
+    // Check if this is one of the first 10 non-admin users
     const userCount = await User.countDocuments({ role: 'user' });
     const badges = [];
-    if (userCount === 0) {
+    if (userCount < 10) {
       badges.push({
         type: 'firstUser',
-        label: '👑 Pioneer',
-        description: 'First registered user on the platform'
+        label: '🌟 Early Adopter',
+        description: 'One of the first 10 users to join the platform'
       });
     }
 
     // Set profile picture URL
     let profilePictureUrl;
     if (req.file) {
-      // If a file was uploaded, use its path
-      profilePictureUrl = `/uploads/${req.file.filename}`;
+      // If a file was uploaded, use the full URL
+      profilePictureUrl = `${process.env.BACKEND_URL || 'https://gambling-wins-backend.onrender.com'}/uploads/${req.file.filename}`;
     } else {
       // Generate avatar URL if no file was uploaded
       profilePictureUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random&size=200`;
@@ -597,9 +597,14 @@ app.get('/api/users/:username', async (req, res) => {
       return winObj;
     });
 
+    // Ensure profile picture has full URL
+    const profilePicture = user.profilePicture.startsWith('http') 
+      ? user.profilePicture 
+      : `${process.env.BACKEND_URL || 'https://gambling-wins-backend.onrender.com'}${user.profilePicture}`;
+
     res.json({
       username: user.username,
-      profilePicture: user.profilePicture,
+      profilePicture: profilePicture,
       role: user.role,
       joinDate: user.joinDate,
       badges: user.badges || [],
