@@ -527,23 +527,25 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
 
     // Check if this is one of the first 10 non-admin users
     const userCount = await User.countDocuments({ role: 'user' });
+    console.log('Current user count:', userCount); // Debug log
+    
     const badges = [];
     if (userCount < 10) {
-      badges.push({
+      const badge = {
         type: 'firstUser',
         label: '👑',
         position: userCount + 1,
         description: `First User ${userCount + 1}/10`
-      });
+      };
+      badges.push(badge);
+      console.log('Assigning badge:', badge); // Debug log
     }
 
     // Set profile picture URL
     let profilePictureUrl;
     if (req.file) {
-      // If a file was uploaded, use the full URL
       profilePictureUrl = `${process.env.BACKEND_URL || 'https://gambling-wins-backend.onrender.com'}/uploads/${req.file.filename}`;
     } else {
-      // Generate avatar URL if no file was uploaded
       profilePictureUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random&size=200`;
     }
 
@@ -558,9 +560,11 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
     });
 
     await user.save();
+    console.log('User saved with badges:', user.badges); // Debug log
+    
     res.status(201).json({ 
       message: 'User registered successfully',
-      badges: user.badges // Return badges so frontend can show them
+      badges: user.badges
     });
   } catch (error) {
     console.error('Error registering user:', error);
