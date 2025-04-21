@@ -46,7 +46,7 @@ const checkText = (text) => {
 
 // CORS configuration
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
@@ -56,7 +56,7 @@ app.use(cors({
 
 // Additional CORS headers for all responses
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   res.header('Access-Control-Allow-Credentials', 'true');
@@ -68,9 +68,16 @@ app.use((req, res, next) => {
   next();
 });
 
+// Create uploads directory if it doesn't exist
+const fs = require('fs');
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Middleware
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(uploadsDir));
 
 // MongoDB Connection
 mongoose.connect("mongodb+srv://DaveAlde:NwTtd7vZp7rNaHOM@cluster0.x5pccae.mongodb.net/gemblewins?retryWrites=true&w=majority&appName=Cluster0", {
@@ -95,7 +102,7 @@ mongoose.connection.once('open', () => {
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/');
+    cb(null, uploadsDir);
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + '-' + file.originalname);
@@ -557,12 +564,6 @@ app.put('/api/users/settings', authenticateUser, upload.single('profilePicture')
     res.status(500).json({ message: error.message });
   }
 });
-
-// Create uploads directory if it doesn't exist
-const fs = require('fs');
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
