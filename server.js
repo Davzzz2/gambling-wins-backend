@@ -130,6 +130,7 @@ const userSchema = new mongoose.Schema({
   badges: [{
     type: { type: String, enum: ['firstUser'] },
     label: String,
+    position: Number,
     description: String
   }]
 });
@@ -530,8 +531,9 @@ app.post('/api/register', upload.single('profilePicture'), async (req, res) => {
     if (userCount < 10) {
       badges.push({
         type: 'firstUser',
-        label: '🌟 Early Adopter',
-        description: 'One of the first 10 users to join the platform'
+        label: '👑',
+        position: userCount + 1,
+        description: `First User ${userCount + 1}/10`
       });
     }
 
