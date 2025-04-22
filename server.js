@@ -304,6 +304,39 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
+// Verify token endpoint
+app.get('/api/verify', authenticateUser, (req, res) => {
+  try {
+    // If we get here, the token is valid (authenticateUser middleware already verified it)
+    res.status(200).json({ 
+      valid: true,
+      user: {
+        username: req.user.username,
+        role: req.user.role,
+        profilePicture: req.user.profilePicture
+      }
+    });
+  } catch (error) {
+    console.error('Token verification error:', error);
+    res.status(500).json({ message: 'Error verifying token' });
+  }
+});
+
+// Logout endpoint
+app.post('/api/logout', authenticateUser, (req, res) => {
+  try {
+    // In a more complex implementation, you might want to:
+    // 1. Add the token to a blacklist
+    // 2. Clear any server-side sessions
+    // 3. Revoke refresh tokens
+    
+    res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: 'Error during logout' });
+  }
+});
+
 // Create a new win
 app.post('/api/wins', authenticateUser, upload.single('image'), async (req, res) => {
   try {
